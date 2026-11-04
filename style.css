@@ -75,6 +75,8 @@ section { display: flex; flex-direction: column; min-height: 0; padding-top: 40p
 #view { flex: 1; padding: 0 28px 40px; }
 #view > * { animation: rise .5s var(--spring) both; }
 .loading, .empty { padding: 40px 0; color: var(--mid); letter-spacing: .15em; }
+.empty p { letter-spacing: normal; line-height: 1.6; max-width: 620px; margin-top: 10px; } /* sentences, not labels */
+.empty p:not(.dim) { color: var(--paper); }
 .loading::after { content: ""; display: inline-block; width: 1ch; animation: blink 1s steps(2) infinite; background: var(--mid); height: 1em; vertical-align: -2px; margin-left: 4px; }
 @keyframes blink { 50% { opacity: 0; } }
 
