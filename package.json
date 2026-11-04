@@ -10,5 +10,7 @@
   },
   "devDependencies": {
     "electron": "https://github.com/castlabs/electron-releases#v44.10.1+wvcus"
-  }
+  },
+  "license": "MIT",
+  "author": "Ronish Nadar"
 }

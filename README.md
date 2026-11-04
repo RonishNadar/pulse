@@ -52,3 +52,7 @@ Apps in Spotify's development mode can't use recommendations, Spotify-made playl
 | `app.js` | Spotify API, playback, views, library actions |
 | `extras.js` | Command palette, lyrics, stats, playlist editing, scrobbling, settings |
 | `build.sh` | Builds, signs and packages the macOS app |
+
+## License
+
+[MIT](LICENSE) © 2026 Ronish Nadar
