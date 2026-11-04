@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pulse</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="paused login">
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="drag"></div>
+
+<aside>
+  <div class="brand"><i></i>PULSE</div>
+  <nav>
+    <button class="nav" data-v="home">HOME</button>
+    <button class="nav" data-v="search">SEARCH</button>
+    <button class="nav" data-v="library">LIBRARY</button>
+    <button class="nav" data-v="history">HISTORY</button>
+    <button class="nav" data-v="stats">STATS</button>
+  </nav>
+  <div class="label">PLAYLISTS <button id="newPl" class="mini" aria-label="Create playlist" title="Create playlist">+</button></div>
+  <ul id="lists" class="scroll"></ul>
+  <div class="foot"><span id="me" class="clip"></span><button id="settingsBtn" class="gear" aria-label="Settings" title="Settings"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M7 1h2v2h2V2h2v2h-1v2h2v2h-2v2h1v2h-2v-1h-2v2H9v2H7v-2H5v1H3v-2h1V9H2V7h2V5H3V3h2v1h2zm0 5v4h2V6z"/></svg></button></div>
+</aside>
+
+<section>
+  <div class="topbar">
+    <button id="back" class="mini" aria-label="Back">‹</button>
+    <button id="fwd" class="mini" aria-label="Forward">›</button>
+    <input id="search" class="search" type="search" placeholder="What do you want to play?  ⌘F · ⌘K for everything" aria-label="Search Spotify">
+  </div>
+  <div id="view" class="scroll"></div>
+</section>
+
+<main>
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-tab="playing">PLAYING</button>
+    <button class="tab" data-tab="lyrics">LYRICS</button>
+    <button class="tab" data-tab="queue">QUEUE</button>
+    <button class="tab" data-tab="devices">DEVICES</button>
+    <button id="miniBtn" class="mini" aria-label="Mini player" title="Mini player  ⇧⌘M">▣</button>
+  </div>
+
+  <div class="pane" id="pane-playing">
+    <div class="minibar">
+      <button id="pin" class="btn on" title="Keep on top of other windows">ON TOP</button>
+      <button id="expand" class="btn" title="Back to full window  ⇧⌘M">EXPAND</button>
+    </div>
+    <div class="art"><canvas id="art" aria-hidden="true"></canvas></div>
+    <div class="info">
+      <div class="clip"><h2 id="title">NOTHING PLAYING</h2><p id="artist">Pick something to play</p></div>
+      <button id="like" class="heart" aria-label="Save to Liked Songs" hidden>♡</button>
+    </div>
+    <div class="seekwrap">
+      <input id="seek" type="range" min="0" max="1" step="any" value="0" aria-label="Seek">
+      <div class="times"><span id="cur">0:00</span><span id="rem">-0:00</span></div>
+    </div>
+    <div class="controls">
+      <button class="tiny" id="shuffle" aria-label="Shuffle" title="Shuffle"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M3 6h4l9 12h3v-2l3 3-3 3v-2h-4L6 8H3zm13 0h3V4l3 3-3 3V8h-3l-2.6 3.4-1.3-1.7zM3 16h3l2.6-3.4 1.3 1.7L7 18H3z"/></svg></button>
+      <button class="skip" id="prev" aria-label="Previous"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M4 5h3v14H4zm4 7 11-7v14z"/></svg></button>
+      <button id="play" aria-label="Play">
+        <svg class="playicon" width="30" height="30" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>
+        <svg class="pause" width="30" height="30" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
+      </button>
+      <button class="skip" id="next" aria-label="Next"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M17 5h3v14h-3zM5 5l11 7-11 7z"/></svg></button>
+      <button class="tiny" id="repeat" aria-label="Repeat" title="Repeat"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 11V7h13V4l4 4-4 4V9H6v2zm16 2v4H7v3l-4-4 4-4v3h11v-2z"/></svg><b id="repeatOne" hidden>1</b></button>
+    </div>
+    <div class="vol"><span>VOL</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume"></div>
+    <button class="status" id="status">CONNECTING…</button>
+  </div>
+  <div class="pane scroll lyrics" id="pane-lyrics" hidden></div>
+  <div class="pane scroll" id="pane-queue" hidden></div>
+  <div class="pane scroll" id="pane-devices" hidden></div>
+</main>
+
+<div id="login" hidden><div>
+  <h1>PULSE</h1>
+  <p id="loginMsg">Connect your Spotify Premium account to start listening.</p>
+  <form id="setup" hidden>
+    <p class="steps">One-time setup: on <a href="https://developer.spotify.com/dashboard">developer.spotify.com/dashboard</a>
+      create an app, tick <b>Web API</b> + <b>Web Playback SDK</b>, add redirect URI
+      <code>http://127.0.0.1:8888/callback</code>, then paste its Client ID here.</p>
+    <input id="clientId" class="search" placeholder="Client ID" aria-label="Spotify Client ID" spellcheck="false" autocomplete="off">
+    <button class="cta">SAVE</button>
+  </form>
+  <button class="cta" id="loginBtn">CONNECT SPOTIFY</button>
+</div></div>
+<div id="toast" role="status"></div>
+
+<script src="dither.js"></script>
+<script src="app.js"></script>
+<script src="extras.js"></script>
+</body>
+</html>

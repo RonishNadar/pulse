@@ -1,0 +1,14 @@
+{
+  "name": "pulse",
+  "productName": "Pulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dithered Spotify client",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "https://github.com/castlabs/electron-releases#v44.10.1+wvcus"
+  }
+}
