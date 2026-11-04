@@ -2,9 +2,9 @@
 
 const $ = id => document.getElementById(id);
 // ⌘ on macOS, Ctrl elsewhere; labels are written Mac-style and translated
-const MAC = pulse.platform === 'darwin', MOD = MAC ? 'metaKey' : 'ctrlKey';
+const MAC = pulse.platform === 'darwin', IOS = pulse.platform === 'ios', MOD = MAC || IOS ? 'metaKey' : 'ctrlKey';
 const keyLabel = s => MAC ? s : s.replace(/⇧⌘/g, 'Ctrl+Shift+').replace(/⌘/g, 'Ctrl+');
-document.body.classList.add(MAC ? 'mac' : 'wco'); // wco: window controls overlay (Windows/Linux)
+document.body.classList.add(IOS ? 'ios' : MAC ? 'mac' : 'wco'); // wco: window controls overlay (Windows/Linux)
 for (const el of document.querySelectorAll('[title], [placeholder]')) {
   if (el.title) el.title = keyLabel(el.title);
   if (el.placeholder) el.placeholder = keyLabel(el.placeholder);
@@ -102,7 +102,7 @@ const position = () => !now ? 0 : now.paused ? now.position : Math.min(now.durat
 
 let playerStarted = false;
 function startPlayer() {
-  if (playerStarted) return;
+  if (playerStarted || IOS) return; // iPhone: the Spotify app plays; Pulse is its remote
   playerStarted = true;
   window.onSpotifyWebPlaybackSDKReady = () => {
     player = new Spotify.Player({ name: 'Pulse', getOAuthToken: cb => pulse.token().then(cb), volume: +$('vol').value });
@@ -142,11 +142,13 @@ async function poll() {
   } catch { /* offline or no player yet: try again next tick */ }
 }
 setInterval(poll, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); }); // back from the Spotify app
 
 const after = p => p.then(() => setTimeout(poll, 400)).catch(toast);
 const ctl = {
   toggle() {
     if (now?.restored) return resume(now);
+    if (!now && IOS) return playOnPhone({});
     if (!now) return deviceId ? after(put('/me/player', { device_ids: [deviceId], play: true })) : toast('Pick something to play');
     local ? player.togglePlay() : after(put(`/me/player/${now.paused ? 'play' : 'pause'}`));
   },
@@ -158,7 +160,25 @@ const ctl = {
   repeat: () => now && !now.restored && after(put(`/me/player/repeat?state=${{ off: 'context', context: 'track', track: 'off' }[now.repeat]}`)),
 };
 
+// iPhone: play wherever Spotify is active; if nothing is, wake the Spotify app on this phone
+// (it starts the first song and hands control straight back), then give it the full request
+async function playOnPhone(body) {
+  try { await put('/me/player/play', body); setTimeout(poll, 600); return; }
+  catch (e) { if (!/Spotify 404/.test(e.message)) return toast(e); } // 404 = no active device
+  try { await pulse.wake(body.offset?.uri ?? body.uris?.[0] ?? body.context_uri ?? ''); } catch (e) { return toast(e); }
+  for (let i = 0; i < 12; i++) {
+    await new Promise(ok => setTimeout(ok, 500));
+    try {
+      const { devices } = await api('/me/player/devices');
+      const d = devices.find(x => x.is_active) || devices.find(x => x.type === 'Smartphone');
+      if (d) { await put(`/me/player/play?device_id=${d.id}`, body); setTimeout(poll, 600); return; }
+    } catch {}
+  }
+  setTimeout(poll, 600); // Spotify is playing the first song at least
+}
+
 async function play(body) {
+  if (IOS) return playOnPhone(body);
   player?.activateElement?.();
   // play where the music already is; otherwise in Pulse
   const target = now && !local && !now.restored ? '' : deviceId ? `?device_id=${deviceId}` : null;
@@ -187,6 +207,7 @@ async function restoreLast() {
 }
 
 async function resume(n) {
+  if (IOS) return playOnPhone(n.context ? { context_uri: n.context, offset: { uri: n.uri }, position_ms: n.position | 0 } : { uris: [n.uri], position_ms: n.position | 0 });
   if (!deviceId) return toast('Player is still connecting…');
   player?.activateElement?.();
   const at = `/me/player/play?device_id=${deviceId}`, position_ms = n.position | 0;
@@ -281,6 +302,20 @@ function link(text, uri) {
 }
 const artistLinks = artists => artists.flatMap((a, i) => [i ? ', ' : null, a.uri ? link(a.name, a.uri) : a.name]);
 
+// touch long-press -> handler(eventLike); marks the element so the tap that follows is ignored
+function longPress(fn) {
+  let timer;
+  const cancel = () => clearTimeout(timer);
+  return {
+    ontouchstart: e => {
+      const el = e.currentTarget, t = e.touches[0];
+      timer = setTimeout(() => { el.dataset.lp = '1'; fn({ preventDefault() {}, clientX: t.clientX, clientY: t.clientY }); }, 450);
+    },
+    ontouchmove: cancel, ontouchend: cancel, ontouchcancel: cancel,
+  };
+}
+const afterLongPress = e => { const el = e.currentTarget; if (!el.dataset.lp) return false; delete el.dataset.lp; return true; };
+
 function trackTable(playFn, opts = {}) {
   const rows = [], ul = h('ul', { class: 'tracks' + (opts.album === false ? ' noalbum' : '') });
   ul.add = more => {
@@ -289,8 +324,9 @@ function trackTable(playFn, opts = {}) {
       const i = rows.push(t) - 1;
       ul.append(h('li', { style: `--i:${Math.min(i % 50, 20)}` }, h('div', {
         class: 'row trow' + (t.playable === false ? ' off' : ''), role: 'button', tabIndex: 0, 'data-uri': t.uri,
-        onclick: () => playFn(i, rows), onkeydown: e => e.key === 'Enter' && playFn(i, rows),
+        onclick: e => afterLongPress(e) || playFn(i, rows), onkeydown: e => e.key === 'Enter' && playFn(i, rows),
         oncontextmenu: e => trackMenu(e, t, opts, ul),
+        ...(IOS ? longPress(e => trackMenu(e, t, opts, ul)) : {}),
         draggable: !t.episode,
         ondragstart: e => { e.dataTransfer.setData('text/uri-list', t.uri); e.dataTransfer.setData('pulse/pos', String(t.pos ?? '')); e.dataTransfer.effectAllowed = 'copyMove'; },
         ondragover: opts.reorder ? e => { if (e.dataTransfer.types.includes('pulse/pos')) { e.preventDefault(); e.currentTarget.classList.add('drop'); } } : null,
@@ -661,6 +697,32 @@ $('status').onclick = () => showTab('devices');
 $('back').onclick = () => { if (hpos > 0) { hpos--; render(); } };
 $('fwd').onclick = () => { if (hpos < hist.length - 1) { hpos++; render(); } };
 $('newPl').onclick = createPlaylist;
+
+/* iPhone layout: tab bar + mini "now playing" bar; the player panel becomes a slide-up sheet */
+const REDIRECT_URI = IOS ? 'pulse://callback' : 'http://127.0.0.1:8888/callback';
+if (IOS) {
+  const tab = (v, label) => h('button', { class: 'nav', 'data-v': v, onclick: () => go({ v }) }, label);
+  document.body.append(
+    h('div', { id: 'minibar', role: 'button', 'aria-label': 'Open player', onclick: e => { if (!e.target.closest('#mbPlay')) document.body.classList.add('sheet'); } },
+      h('img', { id: 'mbArt', alt: '' }),
+      h('div', { class: 'clip' }, h('b', { id: 'mbTitle' }, 'NOTHING PLAYING'), h('small', { id: 'mbArtist' })),
+      h('button', { id: 'mbPlay', 'aria-label': 'Play or pause', onclick: () => ctl.toggle() }, '▶')),
+    h('nav', { id: 'tabbar' }, tab('home', 'HOME'), tab('search', 'SEARCH'), tab('library', 'LIBRARY'), tab('history', 'HISTORY'), tab('stats', 'STATS')));
+  document.querySelector('main').prepend(h('button', { id: 'sheetClose', 'aria-label': 'Close player', onclick: () => document.body.classList.remove('sheet') }, '⌄'));
+  document.querySelector('.topbar').append($('settingsBtn')); // no sidebar on a phone
+  for (const c of document.querySelectorAll('#login code')) c.textContent = REDIRECT_URI;
+  $('search').placeholder = 'Search songs, artists, albums'; // no keyboard shortcuts on a phone
+  let shown = '';
+  onTick.push(() => { // mini bar mirrors the player; only touch the DOM when something changed
+    const key = now ? `${now.uri}|${now.paused}` : '';
+    if (key === shown) return;
+    shown = key;
+    $('mbArt').src = now?.img || now?.big || '';
+    $('mbTitle').textContent = now?.name || 'NOTHING PLAYING';
+    $('mbArtist').textContent = (now?.artists || []).map(a => a.name).join(', ');
+    $('mbPlay').textContent = now && !now.paused ? '❚❚' : '▶';
+  });
+}
 
 // mini player: compact floating layout of this same window
 let miniOn = false;

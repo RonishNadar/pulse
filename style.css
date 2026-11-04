@@ -236,6 +236,39 @@ kbd { font: inherit; font-size: 11px; padding: 2px 8px; border: 1px solid var(--
 textarea.search { resize: vertical; font: inherit; color: inherit; }
 .settings .form { margin-top: 12px; }
 
+/* ---------- iPhone ---------- */
+body.ios { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.ios > aside, body.ios .drag, body.ios #miniBtn, body.ios .vol, body.ios #fwd { display: none; }
+body.ios section { padding-top: env(safe-area-inset-top); background: color-mix(in srgb, var(--ink) 80%, transparent); }
+body.ios .topbar { padding: 8px 16px 10px; }
+body.ios .topbar .search { min-width: 0; font-size: 16px; } /* 16px stops iOS zooming into the field */
+body.ios #view { padding: 0 16px 24px; }
+body.ios .hello { font-size: 20px; }
+body.ios .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+body.ios .cplay { opacity: 1; transform: none; }
+body.ios .hero { flex-direction: column; align-items: flex-start; gap: 14px; }
+body.ios .hero > img, body.ios .hero > .liked { width: 170px; height: 170px; }
+body.ios .tracks .row, body.ios .tracks.noalbum .row { grid-template-columns: 22px 40px minmax(0, 1fr) 40px; }
+body.ios .tracks .row > .dim.clip { display: none; } /* no album column on a phone */
+body.ios .bar { grid-template-columns: 110px 1fr 32px; }
+body.ios .setrow { grid-template-columns: 1fr; }
+body.ios .setrow .chips { justify-content: flex-start; }
+body.ios main { position: fixed; inset: 0; z-index: 30; border: 0; background: var(--ink); padding: calc(env(safe-area-inset-top) + 4px) 22px calc(env(safe-area-inset-bottom) + 14px); transform: translateY(100%); transition: transform .55s var(--spring); }
+body.ios.sheet main { transform: none; }
+body.ios .pane { justify-content: flex-start; gap: 14px; }
+#sheetClose { align-self: center; flex: none; font-size: 26px; line-height: 1; width: 64px; height: 30px; color: var(--mid); }
+#minibar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 12px; align-items: center; padding: 8px 14px; background: var(--ink); border-top: 1px solid var(--mid); }
+#minibar img { width: 44px; height: 44px; object-fit: cover; outline: 1px solid var(--mid); background: var(--checker); }
+#minibar .clip > * { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mbPlay { width: 44px; height: 44px; background: var(--paper); color: var(--ink); font-size: 15px; transition: transform .4s var(--spring); }
+#mbPlay:active { transform: scale(.88); }
+#tabbar { display: flex; justify-content: space-around; padding: 6px 4px calc(env(safe-area-inset-bottom) + 4px); background: var(--ink); border-top: 1px solid var(--mid); }
+#tabbar .nav { flex: 1; min-width: 0; padding: 10px 2px; font-size: 9px; letter-spacing: .04em; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+body.ios main > *, body.ios .pane > * { min-width: 0; } /* let rows shrink to the phone's width */
+body.ios .tab { min-width: 0; font-size: 9px; letter-spacing: .03em; padding: 7px 0; }
+body.ios #login > div { margin: 16px; padding: 28px 22px; }
+body.ios #toast { max-width: 90vw; bottom: calc(env(safe-area-inset-bottom) + 130px); }
+
 /* ---------- mini player ---------- */
 .minibar { display: none; }
 body.compact { grid-template-columns: 1fr; }
