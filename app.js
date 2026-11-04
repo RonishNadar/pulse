@@ -50,7 +50,7 @@ function toast(msg) {
 /* ---------- Spotify Web API ---------- */
 // Spotify rate limits: a short wait is retried once; a long one (dev-mode apps can be blocked for hours)
 // is reported and remembered, so Pulse stops sending requests that would only extend the block
-let limitedUntil = 0;
+let limitedUntil = +localStorage.getItem('pulse.limitedUntil') || 0; // remembered across launches, so a relaunch doesn't knock again
 const waitText = s => s >= 3600 ? `about ${Math.round(s / 3600)} h` : s >= 60 ? `about ${Math.round(s / 60)} min` : `${Math.ceil(s)} s`;
 const limitError = () => new Error(`Spotify is limiting Pulse’s requests for ${waitText((limitedUntil - Date.now()) / 1000)} (too many requests from this Spotify app). Music already playing keeps going.`);
 
@@ -65,6 +65,7 @@ async function api(path, opts = {}, retry = true) {
     const after = +r.headers.get('Retry-After') || 1;
     if (retry && after <= 5) { await new Promise(ok => setTimeout(ok, after * 1000)); return api(path, opts, false); }
     limitedUntil = Date.now() + after * 1000;
+    localStorage.setItem('pulse.limitedUntil', limitedUntil);
     throw limitError();
   }
   if (r.status === 204 || r.status === 202) return null;
@@ -760,6 +761,14 @@ async function boot() {
     try { me = await api('/me'); break; }
     catch (e) {
       if (document.body.classList.contains('login')) return; // logged out: the login screen takes over
+      if (Date.now() < limitedUntil) { // blocked by Spotify: one steady notice, then try again when the block ends
+        const back = new Date(limitedUntil).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+        $('view').replaceChildren(h('div', { class: 'empty' }, h('div', { class: 'hello' }, 'SPOTIFY IS RESTING'),
+          h('p', {}, `Spotify is limiting requests from this Spotify app (too many recently). Pulse will reconnect by itself around ${back}.`),
+          h('p', { class: 'dim' }, 'Music already playing keeps going, and the Spotify app works as usual. To use Pulse sooner, switch to your own Spotify app in Settings → Account.')));
+        while (Date.now() < limitedUntil) await new Promise(ok => setTimeout(ok, Math.min(60000, limitedUntil - Date.now() + 1000)));
+        wait = 2000; continue;
+      }
       if (/Spotify 403/.test(e.message)) { // dev-mode app: this account isn't on its user list
         await pulse.logout();
         return showConnect(builtIn && !(await pulse.clientInfo()).custom
