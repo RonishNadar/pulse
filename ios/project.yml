@@ -46,7 +46,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: NO # the copy step below writes into the app bundle
         CODE_SIGN_STYLE: Automatic
-        # DEVELOPMENT_TEAM: pick your team in Xcode (Signing & Capabilities); a free Apple ID works
+        DEVELOPMENT_TEAM: AC7DU796S6 # Ronish Nadar (Personal Team); change to your own team ID to build it yourself
     postCompileScripts:
       - name: Copy web UI
         basedOnDependencyAnalysis: false
