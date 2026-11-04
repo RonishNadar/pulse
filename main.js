@@ -1,4 +1,5 @@
-const { app, BrowserWindow, components, ipcMain, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, components, ipcMain, shell, safeStorage } = require('electron');
+const MAC = process.platform === 'darwin', WIN = process.platform === 'win32';
 const http = require('node:http');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -135,9 +136,16 @@ ipcMain.handle('lastfm:nowPlaying', (_, t) => lfm?.sk && lfmCall('track.updateNo
 ipcMain.handle('lastfm:scrobble', (_, t) => lfm?.sk && lfmCall('track.scrobble', t));
 
 /* ---------- open at login ---------- */
-ipcMain.handle('login:get', () => app.getLoginItemSettings().openAtLogin);
-ipcMain.handle('login:set', (_, on) => app.setLoginItemSettings({ openAtLogin: !!on }));
-ipcMain.handle('login:wasOpenedAtLogin', () => !!app.getLoginItemSettings().wasOpenedAtLogin);
+// macOS/Windows: the OS login-item API. Linux has none: an XDG autostart entry does the same job.
+const AUTOSTART = path.join(app.getPath('home'), '.config', 'autostart', 'pulse.desktop');
+ipcMain.handle('login:get', () => MAC || WIN ? app.getLoginItemSettings().openAtLogin : fs.existsSync(AUTOSTART));
+ipcMain.handle('login:set', (_, on) => {
+  if (MAC || WIN) return app.setLoginItemSettings({ openAtLogin: !!on, args: ['--login'] }); // args: Windows only
+  if (!on) return fs.rmSync(AUTOSTART, { force: true });
+  fs.mkdirSync(path.dirname(AUTOSTART), { recursive: true });
+  fs.writeFileSync(AUTOSTART, `[Desktop Entry]\nType=Application\nName=Pulse\nExec="${process.execPath}" --login\nX-GNOME-Autostart-enabled=true\n`);
+});
+ipcMain.handle('login:wasOpenedAtLogin', () => MAC ? !!app.getLoginItemSettings().wasOpenedAtLogin : process.argv.includes('--login'));
 
 ipcMain.handle('configured', () => !!CLIENT_ID);
 ipcMain.handle('setClientId', (_, id) => {
@@ -161,12 +169,12 @@ ipcMain.handle('mini', (_, on) => {
     win.setResizable(false);
     win.setAlwaysOnTop(true, 'floating');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    win.setWindowButtonVisibility?.(false);
+    if (MAC) win.setWindowButtonVisibility(false);
   } else {
     win.setResizable(true);
     win.setAlwaysOnTop(false);
     win.setVisibleOnAllWorkspaces(false, { skipTransformProcessType: true });
-    win.setWindowButtonVisibility?.(true);
+    if (MAC) win.setWindowButtonVisibility(true);
     win.setMinimumSize(1040, 680);
     if (full) win.setBounds(full, true);
   }
@@ -177,7 +185,10 @@ let win;
 function createWindow() {
   win = new BrowserWindow({
     width: 1320, height: 840, minWidth: 1040, minHeight: 680,
-    titleBarStyle: 'hiddenInset', backgroundColor: '#0d080d',
+    backgroundColor: '#0d080d',
+    // macOS: inset traffic lights. Windows/Linux: native controls drawn over our own dark top bar.
+    ...(MAC ? { titleBarStyle: 'hiddenInset' }
+      : { titleBarStyle: 'hidden', titleBarOverlay: { color: '#0d080d', symbolColor: '#e8a8e8', height: 40 }, icon: path.join(__dirname, 'icon.png') }),
     webPreferences: { preload: path.join(__dirname, 'preload.js') },
   });
   win.loadFile('index.html');
@@ -186,6 +197,10 @@ function createWindow() {
   win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (url.startsWith('https://')) shell.openExternal(url); });
 }
 
+// window controls follow the cover colour on Windows/Linux
+ipcMain.on('chrome', (_, color, symbolColor) => { if (!MAC) win?.setTitleBarOverlay({ color, symbolColor }); });
+
+if (!MAC) Menu.setApplicationMenu(null); // no File/Edit bar under the custom top bar; inputs keep Ctrl+C/V natively
 app.whenReady().then(async () => {
   let drmError = null;
   try { await components.whenReady(); } // Widevine CDM must be ready before Spotify can stream

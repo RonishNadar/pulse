@@ -347,7 +347,7 @@ VIEWS.settings = async () => {
     section('KEYBOARD',
       h('div', { class: 'keys' }, [['⌘K', 'Command palette'], ['⌘F', 'Search'], ['Space', 'Play / pause'], ['⌘← ⌘→', 'Previous / next'],
         ['⌘↑ ⌘↓', 'Volume'], ['⌘[ ⌘]', 'Back / forward'], ['⇧⌘M', 'Mini player'], ['Right-click', 'Song menu'], ['Drag a song', 'Onto a playlist in the sidebar'],
-      ].map(([k, v]) => h('div', {}, h('kbd', {}, k), h('span', { class: 'dim' }, v))))));
+      ].map(([k, v]) => h('div', {}, h('kbd', {}, keyLabel(k)), h('span', { class: 'dim' }, v))))));
 };
 
 $('settingsBtn').onclick = () => go({ v: 'settings' });

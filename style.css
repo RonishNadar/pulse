@@ -11,7 +11,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  font: 13px/1.5 ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font: 13px/1.5 ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "Cascadia Mono", Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   color: var(--paper); background: var(--ink); overflow: hidden; user-select: none;
   display: grid; grid-template-columns: 240px 1fr 380px;
   -webkit-font-smoothing: antialiased;
@@ -69,7 +69,7 @@ nav { display: grid; padding: 0 8px 14px; border-bottom: 1px solid var(--mid); m
 /* ---------- content ---------- */
 section { display: flex; flex-direction: column; min-height: 0; padding-top: 40px; background: color-mix(in srgb, var(--ink) 72%, transparent); }
 .topbar { display: flex; gap: 8px; align-items: center; padding: 4px 28px 14px; position: relative; z-index: 11; }
-.search { flex: 1; max-width: 420px; padding: 6px 10px; border: 1px solid var(--mid); background: var(--ink); outline: none; transition: border-color .2s; user-select: text; }
+.search { flex: 1; max-width: 500px; padding: 6px 10px; border: 1px solid var(--mid); background: var(--ink); outline: none; transition: border-color .2s; user-select: text; }
 .search:focus { border-color: var(--paper); }
 .search::placeholder { color: var(--mid); }
 #view { flex: 1; padding: 0 28px 40px; }
@@ -242,6 +242,9 @@ body.compact main { padding: 12px 14px; border: 0; background: color-mix(in srgb
 body.compact main :is(button, input, a) { -webkit-app-region: no-drag; }
 body.compact #pane-playing { display: grid !important; grid-template-columns: 112px minmax(0, 1fr); gap: 10px 14px; align-content: start; }
 body.compact .minibar { display: flex; gap: 6px; justify-content: flex-end; grid-column: 1 / -1; }
+body.compact.wco .minibar { justify-content: flex-start; } /* Windows/Linux: keep clear of the window buttons on the right */
+body.wco main { padding-top: 52px; } /* tabs sit below the 40px title-bar buttons */
+body.compact.wco main { padding-top: 10px; } /* mini: controls share the top row with the buttons */
 body.compact .minibar .btn { padding: 3px 8px; font-size: 10px; }
 body.compact .art { grid-row: span 2; outline-offset: 3px; }
 body.compact .info { padding: 6px 8px; align-self: end; }

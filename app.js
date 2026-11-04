@@ -1,6 +1,14 @@
 /* Pulse: Spotify client. Views, playback, library actions. Visuals live in dither.js. */
 
 const $ = id => document.getElementById(id);
+// ⌘ on macOS, Ctrl elsewhere; labels are written Mac-style and translated
+const MAC = pulse.platform === 'darwin', MOD = MAC ? 'metaKey' : 'ctrlKey';
+const keyLabel = s => MAC ? s : s.replace(/⇧⌘/g, 'Ctrl+Shift+').replace(/⌘/g, 'Ctrl+');
+document.body.classList.add(MAC ? 'mac' : 'wco'); // wco: window controls overlay (Windows/Linux)
+for (const el of document.querySelectorAll('[title], [placeholder]')) {
+  if (el.title) el.title = keyLabel(el.title);
+  if (el.placeholder) el.placeholder = keyLabel(el.placeholder);
+}
 const fmt = ms => { const s = Math.max(0, ms / 1000 | 0); return `${s / 60 | 0}:${String(s % 60).padStart(2, '0')}`; };
 const fill = el => el.style.setProperty('--p', (el.value / el.max) * 100 + '%');
 const idOf = uri => uri?.split(':')[2];
@@ -692,16 +700,16 @@ let volTimer;
 $('vol').oninput = e => { fill(e.target); localStorage.setItem('pulse.volume', e.target.value); volBusyUntil = performance.now() + 3000; clearTimeout(volTimer); volTimer = setTimeout(() => ctl.volume(+e.target.value), 120); };
 
 document.onkeydown = e => {
-  if (e.metaKey && e.code === 'KeyK') { e.preventDefault(); return openPalette(); }
-  if (e.metaKey && (e.code === 'KeyF' || e.code === 'KeyL')) { e.preventDefault(); $('search').focus(); $('search').select(); return; }
-  if (e.metaKey && e.shiftKey && e.code === 'KeyM') { e.preventDefault(); return setMini(!miniOn); }
-  if (e.metaKey && e.code === 'BracketLeft') return $('back').click();
-  if (e.metaKey && e.code === 'BracketRight') return $('fwd').click();
+  if (e[MOD] && e.code === 'KeyK') { e.preventDefault(); return openPalette(); }
+  if (e[MOD] && (e.code === 'KeyF' || e.code === 'KeyL')) { e.preventDefault(); $('search').focus(); $('search').select(); return; }
+  if (e[MOD] && e.shiftKey && e.code === 'KeyM') { e.preventDefault(); return setMini(!miniOn); }
+  if (e[MOD] && e.code === 'BracketLeft') return $('back').click();
+  if (e[MOD] && e.code === 'BracketRight') return $('fwd').click();
   if (e.target.tagName === 'INPUT' || document.querySelector('.modal')) return;
   if (e.code === 'Space') { e.preventDefault(); ctl.toggle(); }
-  if (e.metaKey && e.code === 'ArrowRight') ctl.next();
-  if (e.metaKey && e.code === 'ArrowLeft') ctl.prev();
-  if (e.metaKey && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+  if (e[MOD] && e.code === 'ArrowRight') ctl.next();
+  if (e[MOD] && e.code === 'ArrowLeft') ctl.prev();
+  if (e[MOD] && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
     e.preventDefault();
     const v = $('vol'); v.value = Math.max(0, Math.min(1, +v.value + (e.code === 'ArrowUp' ? .1 : -.1))); v.oninput({ target: v });
   }

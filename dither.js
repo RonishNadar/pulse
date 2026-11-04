@@ -134,7 +134,8 @@ new ResizeObserver(measureGlow).observe(art);
 new MutationObserver(measureGlow).observe(document.body, { attributes: true, attributeFilter: ['class'] }); // login / mini
 addEventListener('resize', measureGlow);
 
-let time = 0, last = 0, hue = 300, artDirty = true, shownHue = -1, lastBg = 0;
+let time = 0, last = 0, hue = 300, artDirty = true, shownHue = -1, lastBg = 0, chromeHue = -99;
+const hex = (h, s, l) => { const p = rgb(h, s, l); return '#' + [p & 255, (p >> 8) & 255, (p >> 16) & 255].map(v => v.toString(16).padStart(2, '0')).join(''); };
 Dither.setPattern('bayer');
 (function frame(now) {
   requestAnimationFrame(frame);
@@ -144,6 +145,7 @@ Dither.setPattern('bayer');
   const e = Dither.playing ? .5 + .5 * Math.sin(time * 3) : 0;
   hue += (hueTarget - hue) * Math.min(1, dt * 4);
   if (Math.abs(hue - shownHue) > .05) { shownHue = hue; document.documentElement.style.setProperty('--hue', hue.toFixed(1)); } // restyles the whole page: only on change
+  if (Math.abs(hue - chromeHue) > 2 && !document.body.classList.contains('mac')) { chromeHue = hue; pulse.chrome(hex(hue, 30, 5), hex(hue, 90, 74)); } // Windows/Linux title-bar buttons
   if (now - lastBg >= (Dither.playing ? 33 : 100)) { lastBg = now; paintBg(time, e, hue); } // background: 30 fps playing, 10 fps paused
   if (curPix) {
     const p = Math.min(1, (now - swapAt) / 700);

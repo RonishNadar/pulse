@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pulse', {
+  platform: process.platform,
+  chrome: (color, symbolColor) => ipcRenderer.send('chrome', color, symbolColor),
   configured: () => ipcRenderer.invoke('configured'),
   setClientId: id => ipcRenderer.invoke('setClientId', id),
   login: () => ipcRenderer.invoke('login'),

@@ -16,7 +16,7 @@ Pulse is an independent project and is not affiliated with or endorsed by Spotif
 
 ## Requirements
 
-- macOS 13+ (Windows and Linux builds planned)
+- macOS 13+, Windows 10/11 (x64), or Linux (x64 / arm64, glibc desktop)
 - Node.js and npm
 - Spotify Premium
 - A Spotify app of your own: create one at <https://developer.spotify.com/dashboard>, tick **Web API** and **Web Playback SDK**, and add the redirect URI `http://127.0.0.1:8888/callback`. Pulse asks for its Client ID on first launch.
@@ -25,8 +25,12 @@ Pulse is an independent project and is not affiliated with or endorsed by Spotif
 
 ```sh
 ./build.sh --setup-signing   # once per Mac: stable local code signature (stops repeated keychain prompts)
-./build.sh --install         # builds dist/Pulse.app + dist/Pulse.dmg and copies the app to /Applications
+./build.sh --install         # macOS: dist/Pulse.app + dist/Pulse.dmg, copied to /Applications
+./build.sh --windows         # Windows: dist/Pulse-win-x64.zip (portable: unzip, run Pulse.exe)
+./build.sh --linux           # Linux: dist/Pulse-linux-x64.tar.gz + -arm64 (run ./install.sh inside)
 ```
+
+Windows and Linux packages build from any OS (macOS included): the script downloads castLabs' runtime for that platform and checks it against their published checksums.
 
 Spotify only streams to apps signed with castLabs' free VMP service. Install it once:
 
@@ -35,7 +39,7 @@ python3 -m pip install --user castlabs-evs
 python3 -m castlabs_evs.account signup
 ```
 
-`build.sh` signs automatically when it's available.
+`build.sh` signs macOS and Windows builds automatically when it's available. Linux has no VMP, so Linux builds need no signing.
 
 ## Spotify API limits
 
@@ -51,7 +55,7 @@ Apps in Spotify's development mode can't use recommendations, Spotify-made playl
 | `dither.js` | Dithering engine: background, cover dissolve, patterns |
 | `app.js` | Spotify API, playback, views, library actions |
 | `extras.js` | Command palette, lyrics, stats, playlist editing, scrobbling, settings |
-| `build.sh` | Builds, signs and packages the macOS app |
+| `build.sh` | Builds, signs and packages for macOS, Windows and Linux |
 
 ## License
 
