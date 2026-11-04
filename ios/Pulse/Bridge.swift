@@ -190,7 +190,8 @@ final class Spotify: NSObject, ASWebAuthenticationPresentationContextProviding {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             wakeWaiter = cont
             remote.authorizeAndPlayURI(uri) { installed in
-                if !installed {
+                guard !installed else { return }
+                Task { @MainActor in // the SDK calls back on the main thread, but doesn't say so to Swift
                     self.finishWake(PulseError(message: "The Spotify app isn’t installed. Get it from the App Store, log in, then try again."))
                 }
             }

@@ -187,7 +187,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 0; he
 .cta { padding: 12px 22px; background: var(--paper); color: var(--ink); font-weight: 700; letter-spacing: .15em; transition: transform .45s var(--spring), box-shadow .3s; }
 .cta:hover { box-shadow: 6px 6px 0 var(--mid); }
 .cta:active { transform: scale(.95); }
-body.login > :is(aside, section, main) { visibility: hidden; }
+body.login > :is(aside, section, main, #minibar, #tabbar) { visibility: hidden; }
 
 #toast { position: fixed; bottom: 24px; left: 50%; translate: -50% 0; background: var(--ink); border: 1px solid var(--paper); padding: 10px 16px; z-index: 50; max-width: 60vw; transition: opacity .3s, transform .5s var(--spring); }
 #toast:not(.show) { opacity: 0; transform: translateY(20px); pointer-events: none; }
