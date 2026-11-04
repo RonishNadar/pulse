@@ -48,15 +48,24 @@ function toast(msg) {
 }
 
 /* ---------- Spotify Web API ---------- */
+// Spotify rate limits: a short wait is retried once; a long one (dev-mode apps can be blocked for hours)
+// is reported and remembered, so Pulse stops sending requests that would only extend the block
+let limitedUntil = 0;
+const waitText = s => s >= 3600 ? `about ${Math.round(s / 3600)} h` : s >= 60 ? `about ${Math.round(s / 60)} min` : `${Math.ceil(s)} s`;
+const limitError = () => new Error(`Spotify is limiting Pulse’s requests for ${waitText((limitedUntil - Date.now()) / 1000)} (too many requests from this Spotify app). Music already playing keeps going.`);
+
 async function api(path, opts = {}, retry = true) {
+  if (Date.now() < limitedUntil) throw limitError();
   const token = await pulse.token();
   if (!token) { showLogin(); throw new Error('Session expired, please log in again'); }
   const r = await fetch(path.startsWith('http') ? path : 'https://api.spotify.com/v1' + path, {
     ...opts, headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
   });
-  if (r.status === 429 && retry) { // rate limited: wait as told, once
-    await new Promise(ok => setTimeout(ok, (+r.headers.get('Retry-After') || 1) * 1000));
-    return api(path, opts, false);
+  if (r.status === 429) {
+    const after = +r.headers.get('Retry-After') || 1;
+    if (retry && after <= 5) { await new Promise(ok => setTimeout(ok, after * 1000)); return api(path, opts, false); }
+    limitedUntil = Date.now() + after * 1000;
+    throw limitError();
   }
   if (r.status === 204 || r.status === 202) return null;
   const text = await r.text();
@@ -132,7 +141,7 @@ let volBusyUntil = 0; // don't let polls fight a volume change in progress
 
 // when Pulse isn't the active device, mirror whatever is playing elsewhere (Spotify Connect)
 async function poll() {
-  if (local || document.body.classList.contains('login')) return;
+  if (local || document.hidden || Date.now() < limitedUntil || document.body.classList.contains('login')) return;
   try {
     const d = await api('/me/player?additional_types=episode');
     if (!d?.item) { if (!now?.restored) { setNow(null); restoreLast(); } return; } // nothing active anywhere: show the last song
@@ -141,7 +150,8 @@ async function poll() {
       shuffle: d.shuffle_state, repeat: d.repeat_state, device: d.device?.name, context: d.context?.uri });
   } catch { /* offline or no player yet: try again next tick */ }
 }
-setInterval(poll, 5000);
+setInterval(poll, 5000); // only while visible, see poll()
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 
 const after = p => p.then(() => setTimeout(poll, 400)).catch(toast);
 const ctl = {
@@ -494,6 +504,8 @@ const VIEWS = {
       api('/me/player/recently-played?limit=50'), api('/me/top/artists?limit=12&time_range=short_term'),
       api('/me/top/tracks?limit=10&time_range=short_term'), api('/me/albums?limit=12'),
     ]);
+    const failed = [recent, artists, tracks, albums].filter(r => r.status === 'rejected');
+    if (failed.length === 4) throw failed[0].reason; // nothing loaded: say why (e.g. rate limited) instead of an empty page
     const ok = r => r.status === 'fulfilled' ? r.value : null;
     const seen = new Set(), recentAlbums = (ok(recent)?.items || []).map(i => i.track.album).filter(a => a && !seen.has(a.id) && seen.add(a.id)).slice(0, 12);
     const top = ok(tracks)?.items?.map(t => T(t)) || [];

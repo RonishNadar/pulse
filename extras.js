@@ -363,7 +363,8 @@ VIEWS.settings = async () => {
       ].map(([k, v]) => h('div', {}, h('kbd', {}, keyLabel(k)), h('span', { class: 'dim' }, v))))));
 };
 
-$('settingsBtn').onclick = () => go({ v: 'settings' });
+// the gear toggles: a second click leaves Settings for wherever you were
+$('settingsBtn').onclick = () => hist[hpos]?.v === 'settings' ? (hpos > 0 ? $('back').click() : go({ v: 'home' })) : go({ v: 'settings' });
 
 // opened at login with "start in mini" on
 pulse.loginItem.wasOpenedAtLogin().then(yes => { if (yes && prefs.get('miniAtLogin', false)) setMini(true); }).catch(() => {});
