@@ -50,17 +50,6 @@ python3 -m castlabs_evs.account signup
 
 `build.sh` signs macOS and Windows builds automatically when it's available. Linux has no VMP, so Linux builds need no signing.
 
-## iPhone
-
-Spotify only streams to its own app on iOS (its web player doesn't support phones, and iOS has no Widevine), so Pulse for iPhone is a remote: you browse and pick in Pulse, and the Spotify app plays in the background. The Spotify app must be installed.
-
-```sh
-brew install xcodegen
-cd ios && xcodegen && open Pulse.xcodeproj   # then pick your team under Signing & Capabilities and Run
-```
-
-In your Spotify dashboard, also add the redirect URI `pulse://callback` and, under iOS, the bundle ID `com.ronishnadar.pulse`. A free Apple ID installs to your own phone for 7 days at a time; the Apple Developer Program makes it a year and enables TestFlight.
-
 ## Spotify API limits
 
 Apps in Spotify's development mode can't use recommendations, Spotify-made playlists, artist top tracks, new releases, lyrics, downloads, crossfade or queue reordering, and most list endpoints return at most 10 items per request (February 2026 changes). Pulse works around these where it can.

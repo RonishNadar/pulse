@@ -272,7 +272,7 @@ VIEWS.stats = async ({ range = 'short_term' }) => {
 
 /* ---------- Last.fm scrobbling ---------- */
 let lfmUser = null;
-pulse.lastfm?.status().then(s => { lfmUser = s?.user ?? null; }); // no Last.fm on iPhone (yet)
+pulse.lastfm.status().then(s => { lfmUser = s?.user ?? null; });
 // a play counts once you've heard half the song or 4 minutes, whichever comes first (Last.fm's rule); songs under 30 s never count
 let scrob = null, lastTick = performance.now();
 onTrack.push(n => {
@@ -304,7 +304,7 @@ VIEWS.settings = async () => {
   hue.onchange = () => save({ hue: +hue.value });
   setTimeout(() => fill(hue));
 
-  const atLogin = await pulse.loginItem?.get().catch(() => false);
+  const atLogin = await pulse.loginItem.get().catch(() => false);
   const app_ = await pulse.clientInfo();
   const fm = lfmUser
     ? [rowOf(`Connected as ${lfmUser}`, 'Songs count after half their length or 4 minutes. Only while Pulse is open.',
@@ -334,16 +334,16 @@ VIEWS.settings = async () => {
       rowOf('Colour', 'Follow each album cover, or keep one colour',
         chip('FOLLOW COVER', s.hue == null, () => save({ hue: null })), chip('FIXED', s.hue != null, () => save({ hue: Math.round(hueTarget) }))),
       s.hue != null ? h('div', { class: 'huewrap' }, hue) : null),
-    !pulse.loginItem ? null : section('STARTUP',
+    section('STARTUP',
       rowOf('Open Pulse when you log in to your Mac', null,
         chip('ON', atLogin, async () => { await pulse.loginItem.set(true); go({ v: 'settings' }, true); }),
         chip('OFF', !atLogin, async () => { await pulse.loginItem.set(false); go({ v: 'settings' }, true); })),
       rowOf('Start in the mini player when opened at login', null,
         chip('ON', prefs.get('miniAtLogin', false), () => { prefs.set('miniAtLogin', true); go({ v: 'settings' }, true); }),
         chip('OFF', !prefs.get('miniAtLogin', false), () => { prefs.set('miniAtLogin', false); go({ v: 'settings' }, true); }))),
-    !pulse.lastfm ? null : section('LAST.FM SCROBBLING', ...fm),
+    section('LAST.FM SCROBBLING', ...fm),
     section('ACCOUNT',
-      rowOf(`Signed in as ${me?.display_name || me?.id || '…'}`, 'Logging out forgets your Spotify login on this device.',
+      rowOf(`Signed in as ${me?.display_name || me?.id || '…'}`, 'Logging out forgets your Spotify login on this computer.',
         chip('LOG OUT', false, logout)),
       rowOf('Spotify app', app_.custom ? `Your own app (Client ID ${app_.custom})` : 'Pulse’s built-in app: up to 5 invited people',
         app_.custom && app_.builtIn ? chip('USE BUILT-IN', false, async () => { await pulse.useBuiltIn(); location.reload(); }) : null,
@@ -351,7 +351,7 @@ VIEWS.settings = async () => {
           const id = await modal('USE YOUR OWN SPOTIFY APP', done => {
             const input = h('input', { class: 'search', placeholder: 'Client ID', spellcheck: false });
             return h('form', { class: 'form', onsubmit: e => { e.preventDefault(); done(input.value); } },
-              h('p', { class: 'dim' }, `On developer.spotify.com/dashboard create an app, tick Web API${IOS ? ' + iOS' : ' + Web Playback SDK'}, add redirect URI ${REDIRECT_URI}, then paste its Client ID. Switching apps logs you out once.`),
+              h('p', { class: 'dim' }, 'On developer.spotify.com/dashboard create an app, tick Web API + Web Playback SDK, add redirect URI http://127.0.0.1:8888/callback, then paste its Client ID. Switching apps logs you out once.'),
               input, h('div', { class: 'btns' }, h('button', { type: 'button', class: 'btn', onclick: () => done(null) }, 'CANCEL'), h('button', { class: 'btn on' }, 'SAVE')));
           });
           if (!id) return;
@@ -366,4 +366,4 @@ VIEWS.settings = async () => {
 $('settingsBtn').onclick = () => go({ v: 'settings' });
 
 // opened at login with "start in mini" on
-pulse.loginItem?.wasOpenedAtLogin().then(yes => { if (yes && prefs.get('miniAtLogin', false)) setMini(true); }).catch(() => {});
+pulse.loginItem.wasOpenedAtLogin().then(yes => { if (yes && prefs.get('miniAtLogin', false)) setMini(true); }).catch(() => {});
