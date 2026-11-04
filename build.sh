@@ -136,7 +136,9 @@ Needs: Spotify Premium, and a Spotify Client ID (the app explains how on first l
 Saved logins use your desktop keyring (GNOME Keyring / KWallet) when one is running.
 README
             rm -f "dist/$name.tar.gz"
-            tar -C "$BUILD" -czf "dist/$name.tar.gz" "$name"
+            # macOS's bsdtar would embed Mac-only metadata (xattrs) that GNU tar on Linux warns about
+            if tar --version | grep -q bsdtar; then XT="--no-xattrs --no-mac-metadata"; else XT=""; fi
+            COPYFILE_DISABLE=1 tar $XT -C "$BUILD" -czf "dist/$name.tar.gz" "$name"
             echo "Built: dist/$name.tar.gz ($(du -h "dist/$name.tar.gz" | cut -f1))"
         fi
     done
