@@ -5,11 +5,16 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// The Spotify Client ID is entered on first launch and kept in userData/config.json
-// (it is not a secret: PKCE flow, no client secret).
+// Spotify Client ID (not a secret: PKCE flow, no client secret). Two sources:
+//   built-in: build.json, written by `build.sh` for a friends build (owner's app, 5 invited users)
+//   custom:   userData/config.json, the user's own Spotify app (any build)
+// A custom ID wins, so anyone can bring their own app to any build.
 const CONFIG = path.join(app.getPath('userData'), 'config.json');
-let CLIENT_ID = '';
-try { CLIENT_ID = JSON.parse(fs.readFileSync(CONFIG, 'utf8')).clientId || ''; } catch {}
+let BUILT_IN = '', CUSTOM = '';
+try { BUILT_IN = JSON.parse(fs.readFileSync(path.join(__dirname, 'build.json'), 'utf8')).clientId || ''; } catch {}
+try { CUSTOM = JSON.parse(fs.readFileSync(CONFIG, 'utf8')).clientId || ''; } catch {}
+if (CUSTOM === BUILT_IN) CUSTOM = ''; // same app either way: count it as built-in
+const clientIdNow = () => CUSTOM || BUILT_IN;
 const PORT = 8888;
 const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
 const SCOPES = [
@@ -42,7 +47,7 @@ async function tokenRequest(params) {
   const r = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: CLIENT_ID, ...params }),
+    body: new URLSearchParams({ client_id: clientIdNow(), ...params }),
   });
   if (!r.ok) throw Object.assign(new Error(`Spotify token error ${r.status}: ${await r.text()}`), { status: r.status });
   const j = await r.json();
@@ -59,7 +64,7 @@ function login() {
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
     const state = crypto.randomBytes(16).toString('hex');
     const url = authUrl = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
-      client_id: CLIENT_ID, response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES,
+      client_id: clientIdNow(), response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES,
       code_challenge_method: 'S256', code_challenge: challenge, state,
     });
 
@@ -147,14 +152,21 @@ ipcMain.handle('login:set', (_, on) => {
 });
 ipcMain.handle('login:wasOpenedAtLogin', () => MAC ? !!app.getLoginItemSettings().wasOpenedAtLogin : process.argv.includes('--login'));
 
-ipcMain.handle('configured', () => !!CLIENT_ID);
+ipcMain.handle('configured', () => !!clientIdNow());
+// which Spotify app is in use; a login belongs to one app, so switching logs out
+ipcMain.handle('clientInfo', () => ({ builtIn: !!BUILT_IN, custom: CUSTOM ? '••••' + CUSTOM.slice(-4) : null }));
+function switchApp(id) {
+  CUSTOM = id;
+  fs.mkdirSync(path.dirname(CONFIG), { recursive: true });
+  fs.writeFileSync(CONFIG, JSON.stringify(id ? { clientId: id } : {}));
+  tok = null; fs.rmSync(SESSION, { force: true });
+}
 ipcMain.handle('setClientId', (_, id) => {
   id = String(id).trim();
   if (!/^[0-9a-f]{32}$/i.test(id)) throw new Error('That does not look like a Spotify Client ID (32 letters and digits).');
-  CLIENT_ID = id;
-  fs.mkdirSync(path.dirname(CONFIG), { recursive: true });
-  fs.writeFileSync(CONFIG, JSON.stringify({ clientId: id }));
+  if (id !== CUSTOM) switchApp(id);
 });
+ipcMain.handle('useBuiltIn', () => { if (BUILT_IN && CUSTOM) switchApp(''); });
 ipcMain.handle('login', login);
 ipcMain.handle('token', token);
 ipcMain.handle('logout', () => { tok = null; fs.rmSync(SESSION, { force: true }); });

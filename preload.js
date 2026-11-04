@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('pulse', {
   chrome: (color, symbolColor) => ipcRenderer.send('chrome', color, symbolColor),
   configured: () => ipcRenderer.invoke('configured'),
   setClientId: id => ipcRenderer.invoke('setClientId', id),
+  clientInfo: () => ipcRenderer.invoke('clientInfo'),
+  useBuiltIn: () => ipcRenderer.invoke('useBuiltIn'),
   login: () => ipcRenderer.invoke('login'),
   token: () => ipcRenderer.invoke('token'),
   logout: () => ipcRenderer.invoke('logout'),

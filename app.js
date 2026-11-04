@@ -721,6 +721,25 @@ function showLogin(msg) {
   document.body.classList.add('login'); $('login').hidden = false;
   if (msg) $('loginMsg').textContent = msg;
 }
+// login screen has two states: connect (an app is configured) and setup (paste your own Client ID)
+let builtIn = false;
+function showConnect(msg) {
+  showLogin(msg);
+  $('setup').hidden = true; $('loginBtn').hidden = false; $('ownApp').hidden = false;
+}
+function showSetup(msg) {
+  showLogin(msg ?? 'Use your own Spotify app: free, about 2 minutes, and only you (plus up to 4 people you invite) can use it.');
+  $('setup').hidden = false; $('loginBtn').hidden = true; $('ownApp').hidden = true;
+  $('backToConnect').hidden = !builtIn;
+  $('clientId').focus();
+}
+$('ownApp').onclick = () => showSetup();
+$('backToConnect').onclick = async () => { await pulse.useBuiltIn(); showConnect('Connect your Spotify Premium account to start listening.'); };
+$('setup').onsubmit = async e => {
+  e.preventDefault();
+  try { await pulse.setClientId($('clientId').value); showConnect('Saved. Now connect your Spotify Premium account.'); }
+  catch (err) { toast(err); }
+};
 
 async function boot() {
   document.body.classList.remove('login'); $('login').hidden = true;
@@ -729,6 +748,12 @@ async function boot() {
     try { me = await api('/me'); break; }
     catch (e) {
       if (document.body.classList.contains('login')) return; // logged out: the login screen takes over
+      if (/Spotify 403/.test(e.message)) { // dev-mode app: this account isn't on its user list
+        await pulse.logout();
+        return showConnect(builtIn && !(await pulse.clientInfo()).custom
+          ? 'This Spotify account isn’t on Pulse’s invite list (Spotify allows 5 people per app). Ask the person who shared Pulse to add your email, or use your own Spotify app below.'
+          : 'Spotify refused this account. In your app on developer.spotify.com, add this account’s email under User Management, then connect again.');
+      }
       toast(`${e.message} · retrying in ${wait / 1000}s`);
       await new Promise(ok => setTimeout(ok, wait));
     }
@@ -754,19 +779,8 @@ const savedVolume = () => { const v = parseFloat(localStorage.getItem('pulse.vol
 $('vol').value = savedVolume();
 fill($('vol'));
 (async () => {
-  if (!await pulse.configured()) {
-    showLogin(' ');
-    $('setup').hidden = false; $('loginBtn').hidden = true; $('clientId').focus();
-    $('setup').onsubmit = async e => {
-      e.preventDefault();
-      try {
-        await pulse.setClientId($('clientId').value);
-        $('setup').hidden = true; $('loginBtn').hidden = false;
-        $('loginMsg').textContent = 'Saved. Now connect your Spotify Premium account.';
-      } catch (err) { toast(err); }
-    };
-    return;
-  }
+  builtIn = (await pulse.clientInfo()).builtIn;
+  if (!await pulse.configured()) return showSetup('One-time setup: Pulse needs a Spotify app to talk to Spotify.');
   let t; try { t = await pulse.token(); } catch { t = 'offline'; } // offline: boot keeps retrying
-  t ? boot() : showLogin('Connect your Spotify Premium account. Connected before? Pulse needs a few new permissions (likes, playlists, follows), so connect once more.');
+  t ? boot() : showConnect('Connect your Spotify Premium account to start listening.');
 })();

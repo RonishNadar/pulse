@@ -19,7 +19,16 @@ Pulse is an independent project and is not affiliated with or endorsed by Spotif
 - macOS 13+, Windows 10/11 (x64), or Linux (x64 / arm64, glibc desktop)
 - Node.js and npm
 - Spotify Premium
-- A Spotify app of your own: create one at <https://developer.spotify.com/dashboard>, tick **Web API** and **Web Playback SDK**, and add the redirect URI `http://127.0.0.1:8888/callback`. Pulse asks for its Client ID on first launch.
+- A Spotify app: create one at <https://developer.spotify.com/dashboard>, tick **Web API** and **Web Playback SDK**, and add the redirect URI `http://127.0.0.1:8888/callback`.
+
+### Build types
+
+| Type | How | Who can use it |
+|---|---|---|
+| **Friends build** | `./build.sh --client-id <ID>`, or put the ID in `spotify_client_id.txt` (git-ignored) | You plus up to 4 people you add under **User Management** in your Spotify dashboard. They just click Connect. |
+| **Public build** | `./build.sh --public` | Anyone, but each person creates their own free Spotify app and pastes its Client ID on first launch. |
+
+Spotify limits apps in development mode to 5 users, and lifting that needs Spotify's approval for large businesses, so a single Client ID can't serve everyone. Any build also lets a person switch to their own Spotify app (login screen or Settings → Account).
 
 ## Build
 

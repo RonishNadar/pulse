@@ -12,6 +12,14 @@
 #   ./build.sh --linux           # from any OS with curl/unzip/tar
 #   ./build.sh --linux --arch x64
 #
+# Build type (any platform):
+#   friends build: your Spotify Client ID is built in; you + up to 4 invited people just click Connect
+#                  (Spotify caps development-mode apps at 5 users; add them in your dashboard's User Management)
+#   public build:  nothing built in; each person enters their own Client ID on first launch
+#   --client-id <ID>   friends build with this ID
+#   --public           public build
+#   (neither)          friends build if spotify_client_id.txt exists here, else public
+#
 # Needs: Node/npm (the castLabs Electron, which carries the Widevine DRM Spotify needs).
 # Windows/Linux runtimes are downloaded from castLabs' releases (checksum-checked, cached in .cache/).
 # castLabs EVS (pip install castlabs-evs, sign up once) VMP-signs macOS and Windows builds;
@@ -20,7 +28,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-INSTALL=false; SETUP=false; TARGET=mac; ARCHES=""
+INSTALL=false; SETUP=false; TARGET=mac; ARCHES=""; CLIENT_ID=""; PUBLIC=false
 SIGN_ID="Pulse Local Signing"
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -29,6 +37,8 @@ while [ $# -gt 0 ]; do
         --windows) TARGET=win ;;
         --linux) TARGET=linux ;;
         --arch) ARCHES="$2"; shift ;;
+        --client-id) CLIENT_ID="$2"; shift ;;
+        --public) PUBLIC=true ;;
         *) die "unknown option $1 (see the top of build.sh)" ;;
     esac
     shift
@@ -42,6 +52,17 @@ VERSION="$(node -p 'require("./package.json").version')"
 EVER="$(node -p 'require("./node_modules/electron/package.json").version')"   # e.g. 44.10.1+wvcus
 BUILD="$(mktemp -d)"; trap 'rm -rf "$BUILD"' EXIT
 mkdir -p dist .cache
+
+# build type: a built-in Client ID goes into the app as build.json (not a secret: PKCE, no client secret)
+if $PUBLIC; then CLIENT_ID=""
+elif [ -z "$CLIENT_ID" ] && [ -s spotify_client_id.txt ]; then CLIENT_ID="$(tr -d ' \t\r\n' < spotify_client_id.txt)"; fi
+[ -z "$CLIENT_ID" ] || [[ "$CLIENT_ID" =~ ^[0-9a-fA-F]{32}$ ]] || die "Client ID must be 32 hex characters"
+if [ -n "$CLIENT_ID" ]; then
+    printf '{"clientId":"%s"}\n' "$CLIENT_ID" > "$BUILD/build.json"; KIND="friends build, Client ID ••••${CLIENT_ID: -4}"
+else
+    printf '{}\n' > "$BUILD/build.json"; KIND="public build, no built-in Client ID"
+fi
+echo "Build type: $KIND"
 
 vmp_sign() {   # $1 = folder holding the .app / .exe
     if python3 -c 'import castlabs_evs' 2>/dev/null; then
@@ -75,6 +96,7 @@ if [ "$TARGET" != mac ]; then
         mkdir -p "$OUT/resources/app"
         cp $FILES "$OUT/resources/app/"
         cp assets/icon.png "$OUT/resources/app/icon.png"   # window/taskbar icon
+        cp "$BUILD/build.json" "$OUT/resources/app/"
 
         if [ "$TARGET" = win ]; then
             mv "$OUT/electron.exe" "$OUT/$TITLE.exe"
@@ -173,7 +195,7 @@ rm -rf "$APP"
 ditto "$SRC" "$APP"
 rm -f "$C/Resources/default_app.asar"
 mkdir -p "$C/Resources/app"
-cp $FILES "$C/Resources/app/"
+cp $FILES "$BUILD/build.json" "$C/Resources/app/"
 cp assets/AppIcon.icns "$C/Resources/electron.icns"
 P="$C/Info.plist"
 plutil -replace CFBundleName -string "$TITLE" "$P"

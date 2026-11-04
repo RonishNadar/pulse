@@ -305,6 +305,7 @@ VIEWS.settings = async () => {
   setTimeout(() => fill(hue));
 
   const atLogin = await pulse.loginItem.get().catch(() => false);
+  const app_ = await pulse.clientInfo();
   const fm = lfmUser
     ? [rowOf(`Connected as ${lfmUser}`, 'Songs count after half their length or 4 minutes. Only while Pulse is open.',
         chip('DISCONNECT', false, async () => { await pulse.lastfm.disconnect(); lfmUser = null; go({ v: 'settings' }, true); }))]
@@ -342,8 +343,20 @@ VIEWS.settings = async () => {
         chip('OFF', !prefs.get('miniAtLogin', false), () => { prefs.set('miniAtLogin', false); go({ v: 'settings' }, true); }))),
     section('LAST.FM SCROBBLING', ...fm),
     section('ACCOUNT',
-      rowOf(`Signed in as ${me?.display_name || me?.id || '…'}`, 'Logging out forgets your Spotify login on this Mac.',
-        chip('LOG OUT', false, logout))),
+      rowOf(`Signed in as ${me?.display_name || me?.id || '…'}`, 'Logging out forgets your Spotify login on this computer.',
+        chip('LOG OUT', false, logout)),
+      rowOf('Spotify app', app_.custom ? `Your own app (Client ID ${app_.custom})` : 'Pulse’s built-in app: up to 5 invited people',
+        app_.custom && app_.builtIn ? chip('USE BUILT-IN', false, async () => { await pulse.useBuiltIn(); location.reload(); }) : null,
+        chip(app_.custom ? 'CHANGE' : 'USE MY OWN', false, async () => {
+          const id = await modal('USE YOUR OWN SPOTIFY APP', done => {
+            const input = h('input', { class: 'search', placeholder: 'Client ID', spellcheck: false });
+            return h('form', { class: 'form', onsubmit: e => { e.preventDefault(); done(input.value); } },
+              h('p', { class: 'dim' }, 'On developer.spotify.com/dashboard create an app, tick Web API + Web Playback SDK, add redirect URI http://127.0.0.1:8888/callback, then paste its Client ID. Switching apps logs you out once.'),
+              input, h('div', { class: 'btns' }, h('button', { type: 'button', class: 'btn', onclick: () => done(null) }, 'CANCEL'), h('button', { class: 'btn on' }, 'SAVE')));
+          });
+          if (!id) return;
+          try { await pulse.setClientId(id); location.reload(); } catch (e) { toast(e); }
+        }))),
     section('KEYBOARD',
       h('div', { class: 'keys' }, [['⌘K', 'Command palette'], ['⌘F', 'Search'], ['Space', 'Play / pause'], ['⌘← ⌘→', 'Previous / next'],
         ['⌘↑ ⌘↓', 'Volume'], ['⌘[ ⌘]', 'Back / forward'], ['⇧⌘M', 'Mini player'], ['Right-click', 'Song menu'], ['Drag a song', 'Onto a playlist in the sidebar'],

@@ -181,6 +181,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 0; he
 #login a { text-decoration: underline; }
 #login .steps { text-align: left; line-height: 1.7; }
 #setup { display: grid; gap: 12px; }
+.linkish { color: var(--mid); font-size: 11px; letter-spacing: .05em; text-decoration: underline; }
+.linkish:hover { color: var(--paper); }
 #setup .search { max-width: none; }
 .cta { padding: 12px 22px; background: var(--paper); color: var(--ink); font-weight: 700; letter-spacing: .15em; transition: transform .45s var(--spring), box-shadow .3s; }
 .cta:hover { box-shadow: 6px 6px 0 var(--mid); }
