@@ -238,6 +238,23 @@ kbd { font: inherit; font-size: 11px; padding: 2px 8px; border: 1px solid var(--
 textarea.search { resize: vertical; font: inherit; color: inherit; }
 .settings .form { margin-top: 12px; }
 
+/* ---------- local library ---------- */
+.onboard { display: grid; gap: 6px; justify-items: start; padding-top: 12vh; }
+.onboard .cta { margin-top: 18px; }
+.crumbs { margin: -6px 0 16px; letter-spacing: .02em; }
+.crumbs .link { color: var(--paper); }
+.statline { display: flex; gap: 40px; margin: 6px 0 4px; }
+.statline b { display: block; font-size: 30px; letter-spacing: .02em; }
+.statline small { letter-spacing: .2em; }
+.tagform { grid-template-columns: 1fr 1fr; max-width: none; }
+.tagform > :is(.check, .dim, .btns), .tagform > label:has(input[type=file]) { grid-column: 1 / -1; }
+.modal > div:has(.tagform) { width: min(640px, 92vw); }
+.qhead { display: flex; justify-content: space-between; align-items: center; }
+.cimg.liked { font-size: 48px; }
+.hero > .liked.round { border-radius: 50%; }
+.status { cursor: default; }
+img[src^="data:image/png"] { image-rendering: pixelated; } /* generated dithered covers */
+
 /* ---------- mini player ---------- */
 .minibar { display: none; }
 body.compact { grid-template-columns: 1fr; }

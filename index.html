@@ -5,7 +5,7 @@
 <title>Pulse</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body class="paused login">
+<body class="paused">
 <canvas id="bg" aria-hidden="true"></canvas>
 <div class="drag"></div>
 
@@ -20,14 +20,14 @@
   </nav>
   <div class="label">PLAYLISTS <button id="newPl" class="mini" aria-label="Create playlist" title="Create playlist">+</button></div>
   <ul id="lists" class="scroll"></ul>
-  <div class="foot"><span id="me" class="clip"></span><button id="settingsBtn" class="gear" aria-label="Settings" title="Settings"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M7 1h2v2h2V2h2v2h-1v2h2v2h-2v2h1v2h-2v-1h-2v2H9v2H7v-2H5v1H3v-2h1V9H2V7h2V5H3V3h2v1h2zm0 5v4h2V6z"/></svg></button></div>
+  <div class="foot"><span id="me" class="clip">YOUR LIBRARY</span><button id="settingsBtn" class="gear" aria-label="Settings" title="Settings"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M7 1h2v2h2V2h2v2h-1v2h2v2h-2v2h1v2h-2v-1h-2v2H9v2H7v-2H5v1H3v-2h1V9H2V7h2V5H3V3h2v1h2zm0 5v4h2V6z"/></svg></button></div>
 </aside>
 
 <section>
   <div class="topbar">
     <button id="back" class="mini" aria-label="Back">‹</button>
     <button id="fwd" class="mini" aria-label="Forward">›</button>
-    <input id="search" class="search" type="search" placeholder="What do you want to play?  ⌘F · ⌘K for everything" aria-label="Search Spotify">
+    <input id="search" class="search" type="search" placeholder="Search your music  ⌘F · ⌘K for everything" aria-label="Search your music">
   </div>
   <div id="view" class="scroll"></div>
 </section>
@@ -36,8 +36,7 @@
   <div class="tabs" role="tablist">
     <button class="tab on" data-tab="playing">PLAYING</button>
     <button class="tab" data-tab="lyrics">LYRICS</button>
-    <button class="tab" data-tab="queue">QUEUE</button>
-    <button class="tab" data-tab="devices">DEVICES</button>
+    <button class="tab" data-tab="queue">UP NEXT</button>
     <button id="miniBtn" class="mini" aria-label="Mini player" title="Mini player  ⇧⌘M">▣</button>
   </div>
 
@@ -49,7 +48,7 @@
     <div class="art"><canvas id="art" aria-hidden="true"></canvas></div>
     <div class="info">
       <div class="clip"><h2 id="title">NOTHING PLAYING</h2><p id="artist">Pick something to play</p></div>
-      <button id="like" class="heart" aria-label="Save to Liked Songs" hidden>♡</button>
+      <button id="like" class="heart" aria-label="Like" hidden>♡</button>
     </div>
     <div class="seekwrap">
       <input id="seek" type="range" min="0" max="1" step="any" value="0" aria-label="Seek">
@@ -66,27 +65,12 @@
       <button class="tiny" id="repeat" aria-label="Repeat" title="Repeat"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 11V7h13V4l4 4-4 4V9H6v2zm16 2v4H7v3l-4-4 4-4v3h11v-2z"/></svg><b id="repeatOne" hidden>1</b></button>
     </div>
     <div class="vol"><span>VOL</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume"></div>
-    <button class="status" id="status">CONNECTING…</button>
+    <div class="status" id="status">&nbsp;</div>
   </div>
   <div class="pane scroll lyrics" id="pane-lyrics" hidden></div>
   <div class="pane scroll" id="pane-queue" hidden></div>
-  <div class="pane scroll" id="pane-devices" hidden></div>
 </main>
 
-<div id="login" hidden><div>
-  <h1>PULSE</h1>
-  <p id="loginMsg">Connect your Spotify Premium account to start listening.</p>
-  <form id="setup" hidden>
-    <p class="steps">One-time setup: on <a href="https://developer.spotify.com/dashboard">developer.spotify.com/dashboard</a>
-      create an app, tick <b>Web API</b> + <b>Web Playback SDK</b>, add redirect URI
-      <code>http://127.0.0.1:8888/callback</code>, then paste its Client ID here.</p>
-    <input id="clientId" class="search" placeholder="Client ID" aria-label="Spotify Client ID" spellcheck="false" autocomplete="off">
-    <button class="cta">SAVE</button>
-    <button type="button" class="linkish" id="backToConnect" hidden>← Back to the built-in app</button>
-  </form>
-  <button class="cta" id="loginBtn">CONNECT SPOTIFY</button>
-  <button type="button" class="linkish" id="ownApp" hidden>Not on the invite list? Use your own Spotify app</button>
-</div></div>
 <div id="toast" role="status"></div>
 
 <script src="dither.js"></script>

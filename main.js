@@ -1,110 +1,52 @@
-const { app, BrowserWindow, Menu, components, ipcMain, shell, safeStorage } = require('electron');
-const MAC = process.platform === 'darwin', WIN = process.platform === 'win32';
-const http = require('node:http');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell, safeStorage } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { Library } = require('./library.js');
+const MAC = process.platform === 'darwin', WIN = process.platform === 'win32';
+const DATA = app.getPath('userData');
 
-// Spotify Client ID (not a secret: PKCE flow, no client secret). Two sources:
-//   built-in: build.json, written by `build.sh` for a friends build (owner's app, 5 invited users)
-//   custom:   userData/config.json, the user's own Spotify app (any build)
-// A custom ID wins, so anyone can bring their own app to any build.
-const CONFIG = path.join(app.getPath('userData'), 'config.json');
-let BUILT_IN = '', CUSTOM = '';
-try { BUILT_IN = JSON.parse(fs.readFileSync(path.join(__dirname, 'build.json'), 'utf8')).clientId || ''; } catch {}
-try { CUSTOM = JSON.parse(fs.readFileSync(CONFIG, 'utf8')).clientId || ''; } catch {}
-if (CUSTOM === BUILT_IN) CUSTOM = ''; // same app either way: count it as built-in
-const clientIdNow = () => CUSTOM || BUILT_IN;
-const PORT = 8888;
-const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
-const SCOPES = [
-  'streaming', 'user-read-email', 'user-read-private',
-  'user-read-playback-state', 'user-modify-playback-state',
-  'user-read-currently-playing', 'user-read-recently-played', 'user-top-read',
-  'user-library-read', 'user-library-modify', 'user-follow-read', 'user-follow-modify',
-  'playlist-read-private', 'playlist-read-collaborative', 'playlist-modify-public', 'playlist-modify-private',
-  'ugc-image-upload', // playlist covers
-].join(' ');
-// a session granted fewer scopes (older Pulse) must log in again
-const hasScopes = granted => SCOPES.split(' ').every(s => (granted || '').split(' ').includes(s));
+let win;
+const send = (channel, payload) => win?.webContents.send(channel, payload);
 
-const SESSION = path.join(app.getPath('userData'), 'session.bin');
-let tok = null; // { access, refresh, scope, exp }
+/* ---------- music library ---------- */
+const library = new Library(DATA, send);
+ipcMain.handle('library:get', () => library.snapshot());
+ipcMain.handle('library:addFolder', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Add a music folder', properties: ['openDirectory', 'multiSelections'] });
+  if (r.canceled) return library.snapshot();
+  for (const dir of r.filePaths) await library.addFolder(dir);
+  return library.snapshot();
+});
+ipcMain.handle('library:removeFolder', (_, dir) => library.removeFolder(dir));
+ipcMain.handle('library:rescan', () => library.scan());
+ipcMain.handle('library:writeTags', (_, ids, patch, cover) => library.writeTags(ids, patch, cover));
+ipcMain.handle('library:lyrics', (_, id) => library.sidecarLyrics(id));
+ipcMain.handle('library:reveal', (_, id) => { const t = library.data.tracks[id]; if (t) shell.showItemInFolder(t.path); });
 
-function save() {
-  // refresh token is a long-lived credential: encrypt with the OS keychain
-  if (tok && safeStorage.isEncryptionAvailable())
-    fs.writeFileSync(SESSION, safeStorage.encryptString(JSON.stringify({ refresh: tok.refresh, scope: tok.scope })));
-}
-function restore() {
-  try {
-    const s = JSON.parse(safeStorage.decryptString(fs.readFileSync(SESSION)));
-    tok = hasScopes(s.scope) ? { ...s, exp: 0 } : null;
-  } catch { tok = null; }
-}
+/* ---------- your data: likes, playlists, play history (one JSON file, written atomically) ---------- */
+const STORE = path.join(DATA, 'pulse-data.json');
+let store = { likes: {}, playlists: [], plays: [] };
+try { store = { ...store, ...JSON.parse(fs.readFileSync(STORE, 'utf8')) }; } catch {}
+let storeTimer;
+const flushStore = () => { clearTimeout(storeTimer); const tmp = STORE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(store)); fs.renameSync(tmp, STORE); };
+ipcMain.handle('store:get', () => store);
+ipcMain.handle('store:set', (_, key, value) => { store[key] = value; clearTimeout(storeTimer); storeTimer = setTimeout(flushStore, 500); });
+app.on('before-quit', flushStore);
 
-async function tokenRequest(params) {
-  const r = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientIdNow(), ...params }),
-  });
-  if (!r.ok) throw Object.assign(new Error(`Spotify token error ${r.status}: ${await r.text()}`), { status: r.status });
-  const j = await r.json();
-  tok = { access: j.access_token, refresh: j.refresh_token || tok?.refresh, scope: j.scope || tok?.scope, exp: Date.now() + (j.expires_in - 60) * 1000 };
-  save();
-  return tok.access;
-}
-
-let pending = null, authUrl = ''; // one login at a time
-function login() {
-  if (pending) { shell.openExternal(authUrl); return pending; } // clicked again: reopen the page
-  pending = new Promise((resolve, reject) => {
-    const verifier = crypto.randomBytes(64).toString('base64url');
-    const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-    const state = crypto.randomBytes(16).toString('hex');
-    const url = authUrl = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
-      client_id: clientIdNow(), response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES,
-      code_challenge_method: 'S256', code_challenge: challenge, state,
-    });
-
-    const server = http.createServer(async (req, res) => {
-      const u = new URL(req.url, REDIRECT);
-      if (u.pathname !== '/callback') return res.writeHead(404).end();
-      const code = u.searchParams.get('state') === state && u.searchParams.get('code');
-      res.writeHead(200, { 'Content-Type': 'text/html' })
-        .end(`<body style="font:16px monospace;background:#111;color:#eee;padding:40px">${code ? 'Connected. You can close this tab and return to Pulse.' : 'Login failed. Return to Pulse and try again.'}</body>`);
-      server.close();
-      if (!code) return reject(new Error(u.searchParams.get('error') || 'Login state mismatch'));
-      try {
-        resolve(await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier }));
-        win?.focus();
-      } catch (e) { reject(e); }
-    });
-    server.on('error', reject);
-    server.listen(PORT, '127.0.0.1', () => shell.openExternal(url));
-  }).finally(() => { pending = null; });
-  return pending;
-}
-
-// null = logged out (show login); throws = couldn't refresh right now (keep the session, retry later)
-let refreshing = null;
-async function token() {
-  if (tok?.access && Date.now() < tok.exp) return tok.access;
-  if (!tok?.refresh) return null;
-  refreshing ??= tokenRequest({ grant_type: 'refresh_token', refresh_token: tok.refresh })
-    .catch(e => {
-      if (e.status === 400 || e.status === 401) { tok = null; fs.rmSync(SESSION, { force: true }); return null; } // revoked
-      throw new Error('Couldn’t reach Spotify. Check your connection.');
-    })
-    .finally(() => { refreshing = null; });
-  return refreshing;
-}
+// playlist covers you upload: copied into userData so they survive the original file moving
+const COVERS = path.join(DATA, 'covers');
+ipcMain.handle('cover:save', (_, bytes, ext) => {
+  fs.mkdirSync(COVERS, { recursive: true });
+  const name = crypto.randomBytes(8).toString('hex') + (ext === 'png' ? '.png' : '.jpg');
+  fs.writeFileSync(path.join(COVERS, name), Buffer.from(bytes));
+  return require('node:url').pathToFileURL(path.join(COVERS, name)).href;
+});
 
 /* ---------- Last.fm scrobbling (desktop auth flow; requests signed here so the secret stays in this process) ---------- */
-const LASTFM = path.join(app.getPath('userData'), 'lastfm.bin');
-let lfm = null; // { key, secret, sk, user }
-try { lfm = JSON.parse(safeStorage.decryptString(fs.readFileSync(LASTFM))); } catch {}
+const LASTFM = path.join(DATA, 'lastfm.bin');
+let lfm = null; // { key, secret, sk, user }; only read when it exists, so the keychain is touched only by scrobblers
+try { if (fs.existsSync(LASTFM)) lfm = JSON.parse(safeStorage.decryptString(fs.readFileSync(LASTFM))); } catch {}
 const saveLfm = () => lfm ? fs.writeFileSync(LASTFM, safeStorage.encryptString(JSON.stringify(lfm))) : fs.rmSync(LASTFM, { force: true });
 
 async function lfmCall(method, params = {}, creds = lfm) {
@@ -152,26 +94,7 @@ ipcMain.handle('login:set', (_, on) => {
 });
 ipcMain.handle('login:wasOpenedAtLogin', () => MAC ? !!app.getLoginItemSettings().wasOpenedAtLogin : process.argv.includes('--login'));
 
-ipcMain.handle('configured', () => !!clientIdNow());
-// which Spotify app is in use; a login belongs to one app, so switching logs out
-ipcMain.handle('clientInfo', () => ({ builtIn: !!BUILT_IN, custom: CUSTOM ? '••••' + CUSTOM.slice(-4) : null }));
-function switchApp(id) {
-  CUSTOM = id;
-  fs.mkdirSync(path.dirname(CONFIG), { recursive: true });
-  fs.writeFileSync(CONFIG, JSON.stringify(id ? { clientId: id } : {}));
-  tok = null; fs.rmSync(SESSION, { force: true });
-}
-ipcMain.handle('setClientId', (_, id) => {
-  id = String(id).trim();
-  if (!/^[0-9a-f]{32}$/i.test(id)) throw new Error('That does not look like a Spotify Client ID (32 letters and digits).');
-  if (id !== CUSTOM) switchApp(id);
-});
-ipcMain.handle('useBuiltIn', () => { if (BUILT_IN && CUSTOM) switchApp(''); });
-ipcMain.handle('login', login);
-ipcMain.handle('token', token);
-ipcMain.handle('logout', () => { tok = null; fs.rmSync(SESSION, { force: true }); });
-
-// mini player: same window, shrunk and floating; full-size bounds restored on expand
+/* ---------- mini player: same window, shrunk and floating; full-size bounds restored on expand ---------- */
 let full = null;
 ipcMain.handle('mini', (_, on) => {
   if (on) {
@@ -193,7 +116,6 @@ ipcMain.handle('mini', (_, on) => {
 });
 ipcMain.handle('pin', (_, on) => win.setAlwaysOnTop(on, 'floating'));
 
-let win;
 function createWindow() {
   win = new BrowserWindow({
     width: 1320, height: 840, minWidth: 1040, minHeight: 680,
@@ -201,7 +123,7 @@ function createWindow() {
     // macOS: inset traffic lights. Windows/Linux: native controls drawn over our own dark top bar.
     ...(MAC ? { titleBarStyle: 'hiddenInset' }
       : { titleBarStyle: 'hidden', titleBarOverlay: { color: '#0d080d', symbolColor: '#e8a8e8', height: 40 }, icon: path.join(__dirname, 'icon.png') }),
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }, // keep crossfades smooth when hidden
   });
   win.loadFile('index.html');
   // links open in the real browser, never inside the app
@@ -213,13 +135,9 @@ function createWindow() {
 ipcMain.on('chrome', (_, color, symbolColor) => { if (!MAC) win?.setTitleBarOverlay({ color, symbolColor }); });
 
 if (!MAC) Menu.setApplicationMenu(null); // no File/Edit bar under the custom top bar; inputs keep Ctrl+C/V natively
-app.whenReady().then(async () => {
-  let drmError = null;
-  try { await components.whenReady(); } // Widevine CDM must be ready before Spotify can stream
-  catch (e) { drmError = `Spotify playback is unavailable: the DRM component failed to load (${e.message || e}). Check your connection and restart Pulse.`; }
-  restore();
+app.whenReady().then(() => {
   createWindow();
-  if (drmError) win.webContents.once('did-finish-load', () => win.webContents.executeJavaScript(`toast(${JSON.stringify(drmError)})`));
+  if (library.data.folders.length) library.scan(); // catch up on changes made while Pulse was closed
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });

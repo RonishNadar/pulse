@@ -3,14 +3,17 @@
   "productName": "Pulse",
   "version": "0.1.0",
   "private": true,
-  "description": "Dithered Spotify client",
+  "description": "A dithered music player for your own music files",
   "main": "main.js",
   "scripts": {
     "start": "electron ."
   },
-  "devDependencies": {
-    "electron": "https://github.com/castlabs/electron-releases#v44.10.1+wvcus"
-  },
   "license": "MIT",
-  "author": "Ronish Nadar"
+  "author": "Ronish Nadar",
+  "devDependencies": {
+    "electron": "^45.2.2"
+  },
+  "dependencies": {
+    "taglib-wasm": "^2.4.1"
+  }
 }

@@ -1,12 +1,9 @@
 // Dithering engine: animated background + cover display with a Bayer-order dissolve.
-// Exposes setCover(url) and Dither.playing; everything else is internal.
+// Exposes setCover(url) and Dither.*; everything else is internal.
 
-// Spotify's design guidelines say artwork must not be altered. Keep false
-// for anything you distribute; flip to true for fully dithered covers on your own machine.
-const DITHER_COVERS = false;
-
-// style: pattern 'bayer' | 'noise' | 'halftone'; oneBit: 2 tones only; fixedHue: null = follow the cover
-const Dither = { playing: false, oneBit: false, fixedHue: null };
+// style: pattern 'bayer' | 'noise' | 'halftone'; oneBit: 2 tones only; fixedHue: null = follow the cover;
+// ditherCovers: draw album art in the dither style too (set via Dither.setCoverStyle)
+const Dither = { playing: false, oneBit: false, fixedHue: null, ditherCovers: false };
 
 const BAYER = (() => { // 8x8 Bayer threshold matrix, values in (0,1)
   let m = [[0]];
@@ -81,11 +78,12 @@ function paintBg(t, e, hue) {
 
 /* cover: decoded into ImageData, swapped with a Bayer-ordered dissolve */
 const art = document.getElementById('art'), actx = art.getContext('2d');
-art.width = art.height = DITHER_COVERS ? 160 : 600;
-art.style.imageRendering = DITHER_COVERS ? 'pixelated' : 'auto';
+const sizeArt = () => { art.width = art.height = Dither.ditherCovers ? 160 : 600; art.style.imageRendering = Dither.ditherCovers ? 'pixelated' : 'auto'; };
+sizeArt();
 let curPix = null, prevPix = null, swapAt = 0, hueTarget = 300, coverHueNow = 300, coverUrl = '';
 Dither.setHue = h => { Dither.fixedHue = h; hueTarget = h ?? coverHueNow; };
-let redither = null; // re-runs the cover dither after a pattern change (DITHER_COVERS only)
+let redither = null, lastCover = null; // redither: re-runs the cover dither after a pattern change
+Dither.setCoverStyle = on => { Dither.ditherCovers = !!on; sizeArt(); curPix = prevPix = null; coverUrl = ''; setCover(lastCover); };
 
 function coverHue(img) { // hue of the most saturated pixel in an 8x8 downscale
   const c = document.createElement('canvas'); c.width = c.height = 8;
@@ -100,16 +98,19 @@ function coverHue(img) { // hue of the most saturated pixel in an 8x8 downscale
 }
 
 function setCover(url) {
-  if (!url || url === coverUrl) return;
+  lastCover = url;
+  if (url === coverUrl) return;
   coverUrl = url;
-  const img = new Image(); img.crossOrigin = 'anonymous';
+  if (!url) { curPix = prevPix = null; actx.clearRect(0, 0, art.width, art.height); return; } // no art: empty frame, not the last song's cover
+  const img = new Image();
+  if (/^https?:/.test(url)) img.crossOrigin = 'anonymous'; // local files load as-is
   img.onload = () => {
     if (url !== coverUrl) return; // a newer cover was requested meanwhile
     coverHueNow = coverHue(img) ?? coverHueNow; hueTarget = Dither.fixedHue ?? coverHueNow;
     const c = document.createElement('canvas'); c.width = c.height = art.width;
-    const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height);
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = !url.startsWith('data:'); x.drawImage(img, 0, 0, c.width, c.height); // generated covers stay crisp pixels
     const d = x.getImageData(0, 0, c.width, c.height);
-    if (DITHER_COVERS) {
+    if (Dither.ditherCovers) {
       const pal = [rgb(hueTarget, 30, 5), rgb(hueTarget, 60, 30), rgb(hueTarget, 85, 58), rgb(hueTarget, 95, 85)];
       const px = new Uint32Array(d.data.buffer), W = c.width;
       for (let i = 0; i < px.length; i++) {
@@ -125,7 +126,7 @@ function setCover(url) {
 function paintArt(p) {
   if (!prevPix) return actx.putImageData(curPix, 0, 0);
   const W = art.width, out = actx.createImageData(W, W), o = new Uint32Array(out.data.buffer);
-  const a = new Uint32Array(prevPix.data.buffer), b = new Uint32Array(curPix.data.buffer), s = DITHER_COVERS ? 0 : 3;
+  const a = new Uint32Array(prevPix.data.buffer), b = new Uint32Array(curPix.data.buffer), s = Dither.ditherCovers ? 0 : 3;
   for (let i = 0; i < o.length; i++) o[i] = th((i % W) >> s, (i / W | 0) >> s) > p ? a[i] : b[i];
   actx.putImageData(out, 0, 0);
 }

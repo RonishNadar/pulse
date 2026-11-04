@@ -2,4 +2,3 @@ node_modules/
 dist/
 .DS_Store
 .cache/
-spotify_client_id.txt

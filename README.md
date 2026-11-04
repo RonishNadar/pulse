@@ -1,69 +1,45 @@
 # Pulse
 
-A dithered desktop music player for Spotify. Electron (castLabs build, for Spotify's DRM), plain HTML/CSS/JS, no framework.
-
-Pulse is an independent project and is not affiliated with or endorsed by Spotify.
+A dithered music player for the music files on your computer. Electron, plain HTML/CSS/JS, no framework.
 
 ## Features
 
-- Home, search, library, history, stats, album / artist / playlist / podcast pages
-- Playback inside the app (Spotify Premium), plus Spotify Connect control of your other devices
-- Likes, follows, saves; create, edit and reorder playlists; drag songs onto playlists
-- Time-synced lyrics from [LRCLIB](https://lrclib.net)
-- Command palette (⌘K), mini player (⇧⌘M), media keys
-- Dither styles: classic grid, noise, halftone, 1-bit, fixed or cover-matched colour
-- Last.fm scrobbling, open at login, remembers your last song and volume
+- Library from the folders you choose: albums, artists, songs, genres and a folder view. New and changed files are picked up automatically.
+- Crossfade (off to 12 s) and gapless playback: songs from the same album always flow straight into each other.
+- Up Next queue: play next, add to queue, drag to reorder, shuffle and repeat.
+- Tag editor: fix a song's or a whole album's title, artist, album, track numbers, year, genre and album art. Changes are written into the files.
+- Playlists (with your own or dithered covers), Liked Songs, play history and listening stats, all kept on your computer.
+- Time-synced lyrics from a `.lrc` file next to the song, or from [LRCLIB](https://lrclib.net).
+- Command palette (⌘K), mini player (⇧⌘M), media keys, Last.fm scrobbling, open at login.
+- Dither styles: classic grid, noise, halftone, 1-bit, dithered album art, cover-matched or fixed colour. Albums without art get a generated dithered cover.
 
-## Requirements
-
-- macOS 13+, Windows 10/11 (x64), or Linux (x64 / arm64, glibc desktop)
-- Node.js and npm
-- Spotify Premium
-- A Spotify app: create one at <https://developer.spotify.com/dashboard>, tick **Web API** and **Web Playback SDK**, and add the redirect URI `http://127.0.0.1:8888/callback`.
-
-### Build types
-
-| Type | How | Who can use it |
-|---|---|---|
-| **Friends build** | `./build.sh --client-id <ID>`, or put the ID in `spotify_client_id.txt` (git-ignored) | You plus up to 4 people you add under **User Management** in your Spotify dashboard. They just click Connect. |
-| **Public build** | `./build.sh --public` | Anyone, but each person creates their own free Spotify app and pastes its Client ID on first launch. |
-
-Spotify limits apps in development mode to 5 users, and lifting that needs Spotify's approval for large businesses, so a single Client ID can't serve everyone. Any build also lets a person switch to their own Spotify app (login screen or Settings → Account).
+Plays MP3, AAC/M4A, FLAC, OGG Vorbis, Opus and WAV. ALAC and AIFF are listed but can't be played (Chromium has no decoder for them).
 
 ## Build
 
 ```sh
-./build.sh --setup-signing   # once per Mac: stable local code signature (stops repeated keychain prompts)
+npm install
+./build.sh --setup-signing   # once per Mac: stable local code signature
 ./build.sh --install         # macOS: dist/Pulse.app + dist/Pulse.dmg, copied to /Applications
 ./build.sh --windows         # Windows: dist/Pulse-win-x64.zip (portable: unzip, run Pulse.exe)
 ./build.sh --linux           # Linux: dist/Pulse-linux-x64.tar.gz + -arm64 (run ./install.sh inside)
 ```
 
-Windows and Linux packages build from any OS (macOS included): the script downloads castLabs' runtime for that platform and checks it against their published checksums.
+Windows and Linux packages build from any OS: the script downloads Electron's runtime for that platform and checks it against the published checksums.
 
-Spotify only streams to apps signed with castLabs' free VMP service. Install it once:
+## Where things live
 
-```sh
-python3 -m pip install --user castlabs-evs
-python3 -m castlabs_evs.account signup
-```
-
-`build.sh` signs macOS and Windows builds automatically when it's available. Linux has no VMP, so Linux builds need no signing.
-
-## Spotify API limits
-
-Apps in Spotify's development mode can't use recommendations, Spotify-made playlists, artist top tracks, new releases, lyrics, downloads, crossfade or queue reordering, and most list endpoints return at most 10 items per request (February 2026 changes). Pulse works around these where it can.
-
-## Project layout
+Your music is never moved or copied. Pulse keeps its index, cover-art cache, playlists, likes and play history in the app's data folder (`~/Library/Application Support/Pulse` on macOS).
 
 | File | What it does |
 |---|---|
-| `main.js` | Electron main process: window, Spotify login (PKCE), Last.fm signing, mini player, login item |
+| `main.js` | Electron main process: window, data store, Last.fm signing, mini player, login item |
+| `library.js` | Folder scanning, tag reading/writing ([taglib-wasm](https://github.com/CharlesWiltgen/taglib-wasm)), art cache, folder watching |
 | `preload.js` | The small API the page may call |
 | `index.html`, `style.css` | Layout and styling |
 | `dither.js` | Dithering engine: background, cover dissolve, patterns |
-| `app.js` | Spotify API, playback, views, library actions |
-| `extras.js` | Command palette, lyrics, stats, playlist editing, scrobbling, settings |
+| `app.js` | Library index, playback engine (crossfade/gapless), queue, views |
+| `extras.js` | Command palette, lyrics, stats, playlist and tag editing, scrobbling, settings |
 | `build.sh` | Builds, signs and packages for macOS, Windows and Linux |
 
 ## License
